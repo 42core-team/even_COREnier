@@ -11,6 +11,11 @@
 #include <algorithm>
 #include <chrono>
 #include <random>
+#include <limits>
+#include <queue>
+#include <map>
+#include <set>
+#include <random>
 
 struct Rectangle {
 	unsigned int x;
@@ -27,8 +32,9 @@ class JigsawWorldGenerator {
 
 	private:
 		std::vector<MapTemplate> templates_;
-		int minSpacing_ = 1;
-		int expectedResourceCount_ = 20;
+		std::vector<MapTemplate> coreWallTemplates_;
+		int minSpacing_ = 1; // Minimum spacing between templates
+		int expectedResourceCount_ = 25;
 
 		std::vector<Rectangle> coreWallRegions_;
 
@@ -39,8 +45,11 @@ class JigsawWorldGenerator {
 		bool tryPlaceTemplate(Game* game, const MapTemplate &temp, int posX, int posY, bool force);
 		bool canPlaceTemplate(Game* game, const MapTemplate &temp, int posX, int posY);
 
-		void balanceResources(Game* game);
 		void placeWalls(Game* game);
-
+		
 		void placeCoreWalls(Game* game);
+
+		// JigsawWorldBalancer
+		void balanceResourceAmount(Game* game);
+		void balanceResourcesBetweenPlayers(Game* game);
 };
