@@ -163,14 +163,13 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 	unsigned int width = Config::getInstance().width;
 	unsigned int height = Config::getInstance().height;
 
-	// 1. Compute distance maps (BFS) for each core.
-	std::vector<std::vector<std::vector<int>>> coreDistanceMaps;
+	// 1. Compute distance maps for each core.
+	std::map<unsigned int, std::vector<std::vector<int>>> coreDistanceMaps; // map < core id, vert vector < horiz vector < distance > > >
 	for (const auto &core : cores)
-		coreDistanceMaps.push_back(computeDistanceMap(game, core.getPosition()));
+		coreDistanceMaps[core.getId()] = computeDistanceMap(game, core.getPosition());
 
 	// 2. Assign each resource to the closest core by Dijkstra distance.
-	// Map: core index -> vector of resource indices (into game->getObjects())
-	std::vector<std::vector<size_t>> coreResources(cores.size()); // vector 1: core, vector 2: resource, value: index in game->getObjects()
+	std::map<unsigned int, std::vector<size_t>> coreResources; // map < core id, vector < resource id > >
 	for (size_t i = 0; i < game->getObjects().size(); ++i)
 	{
 		auto &obj = game->getObjects()[i];
@@ -178,32 +177,35 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 			continue;
 		Position pos = obj->getPosition();
 		int bestDijkstra = std::numeric_limits<int>::max();
-		size_t bestCore = 0;
+		unsigned int bestCoreId = 0;
 		for (size_t c = 0; c < cores.size(); ++c)
 		{
-			int dijkstra = coreDistanceMaps[c][pos.y][pos.x];
+			int dijkstra = coreDistanceMaps[cores[c].getId()][pos.y][pos.x];
 			if (dijkstra < bestDijkstra)
 			{
 				bestDijkstra = dijkstra;
-				bestCore = c;
+				bestCoreId = cores[c].getId();
 			}
 		}
-		coreResources[bestCore].push_back(i);
+		coreResources[bestCoreId].push_back(game->getObjects()[i]->getId());
 	}
 
 	// 3. Build frequency maps for each core: distance -> count.
 	// Also record for each resource its computed Dijkstra distance from its assigned core.
-	std::vector<std::map<int, int>> coreFreq(cores.size());
-	std::vector<int> resourceDistance(game->getObjects().size(), -1); // indexed by resource index
+	std::map<unsigned int, std::map<int, int>> coreFreq; // map < core id, res counts map < res dist, res dist count > >
+	std::map<unsigned int, int> resourceDistance; // map < res id, res dist >
 
 	for (size_t c = 0; c < cores.size(); ++c)
 	{
-		for (auto resIdx : coreResources[c])
+		for (unsigned int resId : coreResources[c])
 		{
-			Position pos = game->getObjects()[resIdx]->getPosition();
+			auto objPtr = game->getObjectsMap()[resId].lock();
+			if (!objPtr)
+				continue;
+			Position pos = objPtr->getPosition();
 			int d = coreDistanceMaps[c][pos.y][pos.x];
-			coreFreq[c][d]++;
-			resourceDistance[resIdx] = d;
+			coreFreq[cores[c].getId()][d]++;
+			resourceDistance[resId] = d;
 		}
 	}
 
@@ -217,7 +219,7 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 		std::set<int> allDistances;
 		for (const auto &freqMap : coreFreq)
 		{
-			for (const auto &p : freqMap)
+			for (const auto &p : freqMap.second)
 				allDistances.insert(p.first);
 		}
 
@@ -227,19 +229,19 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 			// determine max & mins for that distance level
 			int minCount = std::numeric_limits<int>::max();
 			int maxCount = -1;
-			size_t coreMin = 0, coreMax = 0;
+			int coreMinId = 0, coreMaxId = 0;
 			for (size_t c = 0; c < cores.size(); ++c)
 			{
 				int count = (coreFreq[c].count(d) ? coreFreq[c].at(d) : 0);
 				if (count < minCount)
 				{
 					minCount = count;
-					coreMin = c;
+					coreMinId = cores[c].getId();
 				}
 				if (count > maxCount)
 				{
 					maxCount = count;
-					coreMax = c;
+					coreMaxId = cores[c].getId();
 				}
 			}
 
@@ -251,7 +253,7 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 			// Core 'coreMax' has an excess resource at distance d.
 			// Let's choose a resource in coreMax with that distance.
 			size_t resourceToMove = SIZE_MAX;
-			for (auto resIdx : coreResources[coreMax])
+			for (auto resIdx : coreResources[coreMaxId])
 			{
 				if (resourceDistance[resIdx] == d)
 				{
@@ -267,17 +269,17 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 			}
 
 			// Remove this resource from coreMax's record:
-			coreFreq[coreMax][d]--;
+			coreFreq[coreMaxId][d]--;
 			// Erase resourceToMove from coreResources[coreMax]:
-			auto it = std::find(coreResources[coreMax].begin(), coreResources[coreMax].end(), resourceToMove);
-			if (it != coreResources[coreMax].end())
-				coreResources[coreMax].erase(it);
+			auto it = std::find(coreResources[coreMaxId].begin(), coreResources[coreMaxId].end(), resourceToMove);
+			if (it != coreResources[coreMaxId].end())
+				coreResources[coreMaxId].erase(it);
 
 			// TODO: insert at the closest to core position thats not matching another close position instead of just at the same distance
 			// TODO: move this entire function away from arbitrary array indexes to maps with the normal object ids as keys
 			// Now, we need to find a new position on coreMin's side.
 			Position newPos(-1, -1);
-			const auto &dijkMap = coreDistanceMaps[coreMin];
+			const auto &dijkMap = coreDistanceMaps[coreMinId];
 			bool found = false;
 			for (int y = 0; y < (int)height && !found; ++y)
 			{
@@ -290,18 +292,18 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 
 					// ensure that by Dijkstra, this cell belongs to coreMin
 					size_t minDistance = 999999;
-					size_t minDistanceCore;
-					for (size_t core = 0; core < coreDistanceMaps.size(); core++)
+					int minDistanceCoreId;
+					for (auto & core : coreDistanceMaps)
 					{
-						size_t distance = coreDistanceMaps[core][y][x];
+						size_t distance = coreDistanceMaps[core.first][y][x];
 						if (distance < minDistance)
 						{
 							minDistance = distance;
-							minDistanceCore = core;
+							minDistanceCoreId = core.first;
 						}
 					}
 
-					if (minDistanceCore == coreMin)
+					if (minDistanceCoreId == coreMinId)
 					{
 						newPos = Position(x, y);
 						found = true;
@@ -315,8 +317,8 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 			}
 
 			game->getObjects()[resourceToMove]->setPosition(newPos);
-			coreFreq[coreMin][d]++;
-			coreResources[coreMin].push_back(resourceToMove);
+			coreFreq[coreMinId][d]++;
+			coreResources[coreMinId].push_back(resourceToMove);
 			resourceDistance[resourceToMove] = d;
 			
 			break;

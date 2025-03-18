@@ -314,3 +314,10 @@ Object * Game::getObject(unsigned int id)
 
 	return nullptr;
 }
+std::map<unsigned int, std::weak_ptr<Object>> Game::getObjectsMap()
+{
+	std::map<unsigned int, std::weak_ptr<Object>> objectsMap;
+	for (const auto& objPtr : objects_)
+		objectsMap[objPtr->getId()] = objPtr;
+	return objectsMap;
+}

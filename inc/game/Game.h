@@ -32,7 +32,8 @@ class Game
 		Core * getCore(unsigned int teamId);
 		std::vector<Core> getCores();
 		Object * getObject(unsigned int id);
-		std::vector<std::unique_ptr<Object>> & getObjects() { return objects_; }
+		std::vector<std::shared_ptr<Object>> & getObjects() { return objects_; }
+		std::map<unsigned int, std::weak_ptr<Object>> getObjectsMap();
 
 		Object * getObjectAtPos(Position pos);
 
@@ -48,7 +49,7 @@ class Game
 
 		unsigned int teamCount_;
 		unsigned int nextObjectId_;
-		std::vector<std::unique_ptr<Object>> objects_;
+		std::vector<std::shared_ptr<Object>> objects_;
 		std::vector<Bridge*> bridges_;
 
 		ReplayEncoder replayEncoder_;
