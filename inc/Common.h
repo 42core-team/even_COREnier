@@ -13,15 +13,15 @@ enum class MovementDirection
 
 struct Position
 {
-	unsigned int x;
-	unsigned int y;
+	int x;
+	int y;
 
-	Position(unsigned int x, unsigned int y) : x(x), y(y) {}
-	Position() : x(-1), y(-1) {} // purposeful overflow, max val to indicate invalidity
+	Position(int x, int y) : x(x), y(y) {}
+	Position() : x(-1), y(-1) {}
 
-	bool isValid(unsigned int maxX, unsigned int maxY) const
+	bool isValid(int maxX, int maxY) const
 	{
-		return x < maxX && y < maxY;
+		return x < maxX && y < maxY && x >= 0 && y >= 0;
 	}
 
 	bool operator==(const Position& other) const
@@ -53,7 +53,7 @@ struct Position
 	{
 		return {x + other.x, y + other.y};
 	}
-	Position operator+(unsigned int scalar) const
+	Position operator+(int scalar) const
 	{
 		return {x + scalar, y + scalar};
 	}
@@ -61,7 +61,7 @@ struct Position
 	{
 		return {x - other.x, y - other.y};
 	}
-	Position operator*(unsigned int scalar) const
+	Position operator*(int scalar) const
 	{
 		return {x * scalar, y * scalar};
 	}

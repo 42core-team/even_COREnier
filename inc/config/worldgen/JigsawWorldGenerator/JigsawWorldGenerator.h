@@ -18,10 +18,10 @@
 #include <random>
 
 struct Rectangle {
-	unsigned int x;
-	unsigned int y;
-	unsigned int width;
-	unsigned int height;
+	int x;
+	int y;
+	int width;
+	int height;
 };
 
 class JigsawWorldGenerator {
@@ -34,7 +34,7 @@ class JigsawWorldGenerator {
 		std::vector<MapTemplate> templates_;
 		std::vector<MapTemplate> coreWallTemplates_;
 		int minSpacing_ = 1; // Minimum spacing between templates
-		int expectedResourceCount_ = 25;
+		int expectedResourceCount_ = 25; // excluding resources placed in core walls
 
 		std::vector<Rectangle> coreWallRegions_;
 
@@ -51,5 +51,5 @@ class JigsawWorldGenerator {
 
 		// JigsawWorldBalancer
 		void balanceResourceAmount(Game* game);
-		void balanceResourcesBetweenPlayers(Game* game);
+		void balanceResourceDistribution(Game* game);
 };

@@ -75,8 +75,8 @@ bool JigsawWorldGenerator::canPlaceTemplate(Game* game, const MapTemplate &temp,
 
 			for (const auto &region : coreWallRegions_)
 			{
-				if ((unsigned int)targetX >= region.x && (unsigned int)targetX < region.x + region.width &&
-					(unsigned int)targetY >= region.y && (unsigned int)targetY < region.y + region.height)
+				if (targetX >= region.x && targetX < region.x + region.width &&
+					targetY >= region.y && targetY < region.y + region.height)
 					return false;
 			}
 		}
@@ -151,7 +151,7 @@ void JigsawWorldGenerator::placeWalls(Game* game)
 	std::uniform_int_distribution<int> distX(0, Config::getInstance().width - 1);
 	std::uniform_int_distribution<int> distY(0, Config::getInstance().height - 1);
 
-	for (int i = 0; i < 100; ++i)
+	for (int i = 0; i < 1000; ++i)
 	{
 		int x = distX(eng_);
 		int y = distY(eng_);
@@ -197,8 +197,8 @@ void JigsawWorldGenerator::placeCoreWalls(Game* game)
 	std::uniform_int_distribution<size_t> dist(0, coreWallTemplates_.size() - 1);
 	const MapTemplate selectedTemplate = coreWallTemplates_[dist(eng_)];
 
-	unsigned int worldWidth = Config::getInstance().width;
-	unsigned int worldHeight = Config::getInstance().height;
+	int worldWidth = Config::getInstance().width;
+	int worldHeight = Config::getInstance().height;
 
 	for (const auto &core : game->getCores())
 	{
@@ -238,7 +238,7 @@ void JigsawWorldGenerator::placeCoreWalls(Game* game)
 		}
 
 		tryPlaceTemplate(game, orientedTemplate, placeX, placeY, true);
-		coreWallRegions_.push_back({ (unsigned int)placeX, (unsigned int)placeY, (unsigned int)orientedTemplate.width, (unsigned int)orientedTemplate.height });
+		coreWallRegions_.push_back({ placeX, placeY, orientedTemplate.width, orientedTemplate.height });
 	}
 }
 
@@ -248,16 +248,16 @@ void JigsawWorldGenerator::generateWorld(Game* game)
 	unsigned int height = Config::getInstance().height;
 
 	Logger::Log(LogLevel::INFO, "Generating world map dimensions " + std::to_string(width) + "x" + std::to_string(height));
+	game->visualizeGameState(0);
+
 	Logger::Log(LogLevel::INFO, "Step 1: Placing core walls");
-
 	placeCoreWalls(game);
+	game->visualizeGameState(0);
 
-	Logger::Log(LogLevel::INFO, "Step 2: Placing walls");
-
+	Logger::Log(LogLevel::INFO, "Step 2: Placing templates to create structures");
 	std::uniform_int_distribution<int> distX(0, width - 1);
 	std::uniform_int_distribution<int> distY(0, height - 1);
 	std::uniform_int_distribution<size_t> templateDist(0, templates_.size() - 1);
-	
 	for (int i = 0; i < 1000; ++i)
 	{
 		const MapTemplate &original = templates_[templateDist(eng_)];
@@ -266,12 +266,19 @@ void JigsawWorldGenerator::generateWorld(Game* game)
 		int posY = distY(eng_);
 		tryPlaceTemplate(game, temp, posX, posY);
 	}
+	game->visualizeGameState(0);
 
-	Logger::Log(LogLevel::INFO, "Step 3: Placing remaining walls");
+	Logger::Log(LogLevel::INFO, "Step 3: Placing random walls to fill empty spaces");
 	placeWalls(game);
+	game->visualizeGameState(0);
 
 	Logger::Log(LogLevel::INFO, "Step 4: Balancing resource count");
-	balanceResources(game);
+	balanceResourceAmount(game);
+	game->visualizeGameState(0);
+	
+	Logger::Log(LogLevel::INFO, "Step 5: Balancing resource distribution around cores");
+	balanceResourceDistribution(game);
+	game->visualizeGameState(0);
 
 	Logger::Log(LogLevel::INFO, "World generation complete");
 }

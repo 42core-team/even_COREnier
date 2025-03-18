@@ -154,7 +154,7 @@ std::vector<std::vector<int>> computeDistanceMap(Game* game, const Position& sta
 }
 
 // if you need to change anything about this, may god have mercy on your soul
-void JigsawWorldGenerator::balanceResourcesBetweenPlayers(Game* game)
+void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 {
 	const auto& cores = game->getCores();
 	if (cores.empty())
@@ -165,11 +165,10 @@ void JigsawWorldGenerator::balanceResourcesBetweenPlayers(Game* game)
 
 	// 1. Compute distance maps (BFS) for each core.
 	std::vector<std::vector<std::vector<int>>> coreDistanceMaps;
-	for (const auto &core : cores) {
+	for (const auto &core : cores)
 		coreDistanceMaps.push_back(computeDistanceMap(game, core.getPosition()));
-	}
 
-	// 2. Assign each resource to the closest core by Manhattan distance.
+	// 2. Assign each resource to the closest core by Dijkstra distance.
 	// Map: core index -> vector of resource indices (into game->getObjects())
 	std::vector<std::vector<size_t>> coreResources(cores.size()); // vector 1: core, vector 2: resource, value: index in game->getObjects()
 	for (size_t i = 0; i < game->getObjects().size(); ++i)
@@ -182,7 +181,6 @@ void JigsawWorldGenerator::balanceResourcesBetweenPlayers(Game* game)
 		size_t bestCore = 0;
 		for (size_t c = 0; c < cores.size(); ++c)
 		{
-			Position corePos = cores[c].getPosition();
 			int dijkstra = coreDistanceMaps[c][pos.y][pos.x];
 			if (dijkstra < bestDijkstra)
 			{
@@ -275,54 +273,52 @@ void JigsawWorldGenerator::balanceResourcesBetweenPlayers(Game* game)
 			if (it != coreResources[coreMax].end())
 				coreResources[coreMax].erase(it);
 
-			// TODO: make this not insert at bfs, but at dijkstra position of d instead
+			// TODO: insert at the closest to core position thats not matching another close position instead of just at the same distance
+			// TODO: move this entire function away from arbitrary array indexes to maps with the normal object ids as keys
 			// Now, we need to find a new position on coreMin's side.
-			// Our aim: a cell with BFS distance == d from coreMin, and free of objects.
-			// We scan the grid; one could optimize this by, say, storing candidates in advance.
 			Position newPos(-1, -1);
-			const auto &bfsMap = coreDistanceMaps[coreMin];
+			const auto &dijkMap = coreDistanceMaps[coreMin];
 			bool found = false;
-			for (int y = 0; y < (int)height && !found; ++y) {
-				for (int x = 0; x < (int)width && !found; ++x) {
-					// Check if the BFS distance matches:
-					if (bfsMap[y][x] != d)
+			for (int y = 0; y < (int)height && !found; ++y)
+			{
+				for (int x = 0; x < (int)width && !found; ++x)
+				{
+					if (dijkMap[y][x] != d)
 						continue;
-					// Check if the cell is free:
 					if (game->getObjectAtPos(Position(x, y)) != nullptr)
 						continue;
-					// Also, ensure that by Manhattan, this cell belongs to coreMin:
-					Position pos(x, y);
-					int bestManhattan = std::numeric_limits<int>::max();
-					size_t bestCore = 0;
-					for (size_t c = 0; c < cores.size(); ++c) {
-						Position corePos = cores[c].getPosition();
-						int manhattan = std::abs(pos.x - corePos.x) + std::abs(pos.y - corePos.y);
-						if (manhattan < bestManhattan) {
-							bestManhattan = manhattan;
-							bestCore = c;
+
+					// ensure that by Dijkstra, this cell belongs to coreMin
+					size_t minDistance = 999999;
+					size_t minDistanceCore;
+					for (size_t core = 0; core < coreDistanceMaps.size(); core++)
+					{
+						size_t distance = coreDistanceMaps[core][y][x];
+						if (distance < minDistance)
+						{
+							minDistance = distance;
+							minDistanceCore = core;
 						}
 					}
-					if (bestCore == coreMin) {
-						newPos = pos;
+
+					if (minDistanceCore == coreMin)
+					{
+						newPos = Position(x, y);
 						found = true;
 					}
 				}
 			}
-			if (!found) {
-				// If we cannot find a cell at exactly distance d, one might relax this constraint
-				// (perhaps search for distance d+1 or d-1) but for brevity we simply skip.
-				// A more robust solution would search in a small radius. 😉
+			if (!found)
+			{
+				// TODO: Keep relaxing the constraint by 1 until we find a position.
 				continue;
 			}
-			
-			// Move the resource to the new position.
+
 			game->getObjects()[resourceToMove]->setPosition(newPos);
-			// Update the record for coreMin:
 			coreFreq[coreMin][d]++;
 			coreResources[coreMin].push_back(resourceToMove);
 			resourceDistance[resourceToMove] = d;
 			
-			// One move done—break out of the loop to recalc imbalances.
 			break;
 		}
 		if (balanced)
@@ -330,9 +326,8 @@ void JigsawWorldGenerator::balanceResourcesBetweenPlayers(Game* game)
 		++iter;
 	}
 	
-	if (iter >= MAX_ITER) {
+	if (iter >= MAX_ITER)
 		Logger::Log(LogLevel::WARNING, "Fair balancing did not converge fully after " + std::to_string(MAX_ITER) + " iterations.");
-	} else {
+	else
 		Logger::Log(LogLevel::INFO, "Fair resource balancing complete in " + std::to_string(iter) + " iterations.");
-	}
 }

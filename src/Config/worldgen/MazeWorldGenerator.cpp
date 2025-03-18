@@ -16,8 +16,8 @@ static void recurseCreateMaze(Game* game, const Position & pos)
 	if (game->getObjectAtPos(pos) == nullptr)
 		game->getObjects().push_back(std::make_unique<Wall>(game->getNextObjectId(), pos));
 
-	unsigned int width = Config::getInstance().width;
-	unsigned int height = Config::getInstance().height;
+	int width = Config::getInstance().width;
+	int height = Config::getInstance().height;
 
 	std::vector<Position> directions = {
 		Position(0, -1),
@@ -33,7 +33,7 @@ static void recurseCreateMaze(Game* game, const Position & pos)
 		Position next(pos.x + 2 * offset.x, pos.y + 2 * offset.y);
 		Position between(pos.x + offset.x, pos.y + offset.y);
 
-		if ((int)next.x < 0 || next.x >= width || (int)next.y < 0 || next.y >= height)
+		if (next.x < 0 || next.x >= width || next.y < 0 || next.y >= height)
 			continue;
 
 		if (game->getObjectAtPos(next) == nullptr)
