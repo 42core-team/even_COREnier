@@ -42,6 +42,8 @@ class JigsawWorldGenerator {
 
 		void loadTemplates();
 
+		bool areAllCoresConnected(Game* game);
+
 		bool tryPlaceTemplate(Game* game, const MapTemplate &temp, int posX, int posY, bool force);
 		bool canPlaceTemplate(Game* game, const MapTemplate &temp, int posX, int posY);
 

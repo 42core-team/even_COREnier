@@ -2,6 +2,8 @@
 
 void JigsawWorldGenerator::balanceResourceAmount(Game* game)
 {
+	int max_iter = 1000;
+
 	std::vector<size_t> resourceIndices;
 	for (size_t i = 0; i < game->getObjects().size(); ++i)
 	{
@@ -42,10 +44,11 @@ void JigsawWorldGenerator::balanceResourceAmount(Game* game)
 	else if (currentResources < expectedResourceCount_)
 	{
 		int addCount = expectedResourceCount_ - currentResources;
+		int iter = 0;
 		std::uniform_int_distribution<int> distX(0, Config::getInstance().width - 1);
 		std::uniform_int_distribution<int> distY(0, Config::getInstance().height - 1);
 
-		while (addCount > 0)
+		while (addCount > 0 && ++iter < max_iter)
 		{
 			int x = distX(eng_);
 			int y = distY(eng_);
@@ -67,6 +70,10 @@ void JigsawWorldGenerator::balanceResourceAmount(Game* game)
 					continue;
 
 				game->getObjects().push_back(std::make_unique<Resource>(game->getNextObjectId(), pos));
+
+				if (!areAllCoresConnected(game))
+					game->getObjects().pop_back();
+
 				addCount--;
 			}
 		}
@@ -316,7 +323,11 @@ void JigsawWorldGenerator::balanceResourceDistribution(Game* game)
 				continue;
 			}
 
+			Position oldPos = game->getObjects()[resourceToMove]->getPosition();
 			game->getObjects()[resourceToMove]->setPosition(newPos);
+			if (!areAllCoresConnected(game))
+				game->getObjects()[resourceToMove]->setPosition(oldPos);
+
 			coreFreq[coreMinId][d]++;
 			coreResources[coreMinId].push_back(resourceToMove);
 			resourceDistance[resourceToMove] = d;

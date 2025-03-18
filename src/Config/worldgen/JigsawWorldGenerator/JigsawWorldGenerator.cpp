@@ -42,6 +42,62 @@ void JigsawWorldGenerator::loadTemplates()
 		throw std::runtime_error("No valid core wall templates found in core_wall_template folder.");
 }
 
+bool JigsawWorldGenerator::areAllCoresConnected(Game* game)
+{
+	const auto& cores = game->getCores();
+	if (cores.empty())
+		return true;
+
+	const int width = Config::getInstance().width;
+	const int height = Config::getInstance().height;
+
+	std::vector<bool> visited(width * height, false);
+	auto index = [width](int x, int y) -> int { return y * width + x; };
+
+	std::queue<Position> queue;
+	Position start = cores.front().getPosition();
+	queue.push(start);
+	visited[index(start.x, start.y)] = true;
+
+	while (!queue.empty())
+	{
+		Position current = queue.front();
+		queue.pop();
+
+		std::vector<Position> directions = {
+			{ current.x,     current.y - 1 },
+			{ current.x,     current.y + 1 },
+			{ current.x - 1, current.y     },
+			{ current.x + 1, current.y     }
+		};
+
+		for (const auto& next : directions)
+		{
+			if (next.x < 0 || next.x >= width || next.y < 0 || next.y >= height)
+				continue;
+
+			if (visited[index(next.x, next.y)])
+				continue;
+
+			if (auto obj = game->getObjectAtPos(next))
+				if (obj->getType() == ObjectType::Wall || obj->getType() == ObjectType::Resource)
+					continue;
+
+			visited[index(next.x, next.y)] = true;
+			queue.push(next);
+		}
+	}
+
+	for (const auto& core : cores)
+	{
+		Position corePos = core.getPosition();
+		if (!visited[index(corePos.x, corePos.y)])
+			return false;
+	}
+
+	return true;
+}
+
 bool JigsawWorldGenerator::canPlaceTemplate(Game* game, const MapTemplate &temp, int posX, int posY)
 {
 	for (int y = 0; y < temp.height; ++y)
@@ -150,44 +206,57 @@ void JigsawWorldGenerator::placeWalls(Game* game)
 {
 	std::uniform_int_distribution<int> distX(0, Config::getInstance().width - 1);
 	std::uniform_int_distribution<int> distY(0, Config::getInstance().height - 1);
+	std::uniform_real_distribution<double> probDist(0.0, 1.0);
 
-	for (int i = 0; i < 1000; ++i)
+	for (int i = 0; i < 75; ++i)
 	{
 		int x = distX(eng_);
 		int y = distY(eng_);
 		Position pos(x, y);
-		if (game->getObjectAtPos(pos) == nullptr)
-		{
-			bool nearCore = false;
-			for (const auto &safeZone : coreWallRegions_)
-			{
-				if (pos.x >= safeZone.x && pos.x < safeZone.x + safeZone.width &&
-					pos.y >= safeZone.y && pos.y < safeZone.y + safeZone.height)
-				{
-					nearCore = true;
-					break;
-				}
-			}
-			if (nearCore)
-				continue;
+		
+		if (game->getObjectAtPos(pos) != nullptr)
+			continue;
 
-			bool canPlace = true;
-			for (int sy = -1; sy <= 1; ++sy)
+		bool nearCore = false;
+		for (const auto &safeZone : coreWallRegions_)
+		{
+			if (pos.x >= safeZone.x && pos.x < safeZone.x + safeZone.width &&
+				pos.y >= safeZone.y && pos.y < safeZone.y + safeZone.height)
 			{
-				for (int sx = -1; sx <= 1; ++sx)
-				{
-					Position neighbor(x + sx, y + sy);
-					if (game->getObjectAtPos(neighbor) != nullptr)
-					{
-						canPlace = false;
-						break;
-					}
-				}
-				if (!canPlace)
-					break;
+				nearCore = true;
+				break;
 			}
-			if (canPlace)
-				game->getObjects().push_back(std::make_unique<Wall>(game->getNextObjectId(), pos));
+		}
+		if (nearCore)
+			continue;
+
+		int adjacentObjects = 0;
+		for (int sy = -1; sy <= 1; ++sy)
+		{
+			for (int sx = -1; sx <= 1; ++sx)
+			{
+				if (sx == 0 && sy == 0)
+					continue;
+				Position neighbor(x + sx, y + sy);
+				if (game->getObjectAtPos(neighbor) != nullptr)
+					adjacentObjects++;
+			}
+		}
+
+		if (adjacentObjects >= 3)
+			continue;
+
+		double placementProbability = 0.5;
+		if (adjacentObjects == 1)
+			placementProbability = 0.6;
+		else if (adjacentObjects == 2)
+			placementProbability = 0.9;
+
+		if (probDist(eng_) < placementProbability)
+		{
+			game->getObjects().push_back(std::make_unique<Wall>(game->getNextObjectId(), pos));
+			if (!areAllCoresConnected(game))
+				game->getObjects().pop_back();
 		}
 	}
 }
