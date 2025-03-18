@@ -16,6 +16,7 @@
 #include "Utils.h"
 #include "JigsawWorldGenerator.h"
 #include "ReplayEncoder.h"
+#include "StatsTracker.h"
 
 #include "json.hpp"
 using json = nlohmann::ordered_json;
@@ -37,7 +38,7 @@ class Game
 		Object * getObjectAtPos(Position pos);
 
 		unsigned int getNextObjectId() { return nextObjectId_++; }
-
+		StatsTracker statsTracker_;
 	private:
 		void tick(unsigned long long tick);
 		void sendState(std::vector<std::pair<Action *, Core &>> actions, unsigned long long tick);
@@ -50,6 +51,8 @@ class Game
 		std::vector<Bridge*> bridges_;
 
 		ReplayEncoder replayEncoder_;
+		
+
 
 		void visualizeGameState(unsigned long long tick);
 };

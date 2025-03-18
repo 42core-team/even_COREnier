@@ -1,4 +1,5 @@
 #include "MoveAction.h"
+#include "StatsTracker.h"
 
 MoveAction::MoveAction(json msg) : Action(ActionType::MOVE), attacked_(false)
 {
@@ -104,6 +105,9 @@ bool MoveAction::execute(Game *game, Core * core)
 	if (!obj)
 	{
 		unit->setPosition(newPos);
+		// movement stat tracking
+		game->statsTracker_.incrementMovement(core->getTeamId());
+		//game->statsTracker_.printStats();
 		unit->resetNextMoveOpp();
 		return true;
 	}

@@ -15,6 +15,7 @@
 #include "Game.h"
 #include "Config.h"
 #include "Logger.h"
+#include "StatsTracker.h"
 
 #include "json.hpp"
 using json = nlohmann::ordered_json;
@@ -154,7 +155,7 @@ int main(int argc, char *argv[])
 	});
 
 	gameThread.join();
-
+	game.statsTracker_.printStats();
 	close(server_fd);
 	return 0;
 }

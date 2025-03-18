@@ -8,6 +8,8 @@ Game::Game(std::vector<unsigned int> team_ids) : teamCount_(team_ids.size()), ne
 	shuffle_vector(team_ids_double); // randomly assign core positions to ensure fairness
 	for (unsigned int i = 0; i < team_ids.size(); ++i)
 		objects_.push_back(std::make_unique<Core>(getNextObjectId(), team_ids_double[i], Config::getCorePosition(i)));
+	StatsTracker tempTrack(team_ids);
+	statsTracker_ = tempTrack;
 	JigsawWorldGenerator generator;
 	generator.generateWorld(this);
 	Logger::Log("Game created with " + std::to_string(team_ids.size()) + " teams.");
@@ -128,6 +130,7 @@ void Game::tick(unsigned long long tick)
 			if (obj->getType() == ObjectType::Unit)
 				objects_.push_back(std::make_unique<Resource>(getNextObjectId(), obj->getPosition(), ((Unit *)obj)->getBalance())); // drop balance on death
 			it = objects_.erase(it);
+			// stats: unit died!
 			teamCount_--;
 			// TODO: handle game over (send message, disconnect bridge, decrease teamCount_)
 		}
