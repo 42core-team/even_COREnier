@@ -97,11 +97,17 @@ void ReplayEncoder::includeConfig(json& config)
 	config_ = config;
 }
 
+void ReplayEncoder::includeStats(json& stats)
+{
+	stats_ = stats;
+}
+
 json ReplayEncoder::getReplay() const
 {
 	json finalReplay;
 	finalReplay["ticks"] = ticks_;
 	finalReplay["config"] = config_;
 	finalReplay["full_tick_amount"] = lastTickCount_;
+	finalReplay["stats"] = stats_;
 	return finalReplay;
 }

@@ -24,7 +24,9 @@ public:
 	~StatsTracker();
 	
 	void incrementMovement(unsigned int team_id);
+	void incrementUnitsDied(unsigned int team_id);
 	void printStats();
+	json getStats();
 	std::vector<TeamStats> team_stats;
 };
 

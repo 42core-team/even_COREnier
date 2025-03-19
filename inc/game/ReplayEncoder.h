@@ -12,6 +12,7 @@ public:
 
 	void addTickState(const json& state);
 	void includeConfig(json& config);
+	void includeStats(json& stats);
 	json getReplay() const;
 
 private:
@@ -20,6 +21,7 @@ private:
 
 	json ticks_;
 	json config_;
+	json stats_;
 
 	std::unordered_map<int, json> previousObjects_;
 
