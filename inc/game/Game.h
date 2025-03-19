@@ -6,7 +6,6 @@
 #include <iostream>
 #include <fstream>
 
-#include "Config.h"
 #include "Core.h"
 #include "Unit.h"
 #include "Resource.h"
@@ -14,12 +13,13 @@
 #include "Bridge.h"
 #include "Action.h"
 #include "Utils.h"
-#include "JigsawWorldGenerator.h"
 #include "ReplayEncoder.h"
 #include "StatsTracker.h"
 
 #include "json.hpp"
 using json = nlohmann::ordered_json;
+
+class Config;
 
 class Game
 {
@@ -39,6 +39,8 @@ class Game
 
 		unsigned int getNextObjectId() { return nextObjectId_++; }
 		StatsTracker statsTracker_;
+		void visualizeGameState(unsigned long long tick);
+
 	private:
 		void tick(unsigned long long tick);
 		void sendState(std::vector<std::pair<Action *, Core &>> actions, unsigned long long tick);
@@ -51,10 +53,9 @@ class Game
 		std::vector<Bridge*> bridges_;
 
 		ReplayEncoder replayEncoder_;
-		
-
-
-		void visualizeGameState(unsigned long long tick);
 };
+
+#include "Config.h"
+#include "WorldGenerator.h"
 
 #endif // GAME_H
