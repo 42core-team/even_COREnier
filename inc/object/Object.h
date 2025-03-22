@@ -31,6 +31,7 @@ class Object
 		Position getPosition() const { return position_; };
 		int getHP() const { return hp_; };
 		ObjectType getType() const { return type_; };
+		bool isBlocking() const { return blocking_; };
 
 		void setPosition(Position pos) { position_ = pos; };
 		void setHP(int hp) { hp_ = hp; };
@@ -40,6 +41,7 @@ class Object
 		unsigned int id_;
 		Position position_;
 		int hp_;
+		bool blocking_ = true;
 
 		ObjectType type_;
 };

@@ -22,6 +22,10 @@ std::vector<Action *> Action::parseActions(json msg)
 				newAction = new TransferMoneyAction(actionJson);
 			else if (actionJson["type"] == "build")
 				newAction = new BuildAction(actionJson);
+			else if (actionJson["type"] == "attack")
+				newAction = new AttackAction(actionJson);
+			else
+				Logger::Log(LogLevel::ERROR, "Unknown action type: " + actionJson["type"].get<std::string>());
 			if (newAction && !newAction->is_valid_)
 			{
 				delete newAction;

@@ -4,10 +4,16 @@
 
 Money::Money(unsigned int id, Position pos)
 	: Object(id, pos, 1, ObjectType::Money),
-	balance_(Config::getInstance().resourceIncome) {}
+	balance_(Config::getInstance().resourceIncome)
+{
+	blocking_ = false;
+}
 Money::Money(unsigned int id, Position pos, unsigned int balance)
 	: Object(id, pos, 1, ObjectType::Money),
-	balance_(balance) {}
+	balance_(balance)
+{
+	blocking_ = false;
+}
 
 void Money::tick(unsigned long long tickCount)
 {

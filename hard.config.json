@@ -10,7 +10,7 @@
 	"moneyObjIncome": 100,
 	"coreHp": 350,
 	"initialBalance": 300,
-	"wallHp": 100,
+	"wallHp": 75,
 	"wallBuildCost": 20,
 	"worldGenerator": "jigsaw",
 	"units": [
@@ -24,7 +24,6 @@
 			"damageUnit": 6,
 			"damageResource": 2,
 			"damageWall": 3,
-			"attackType": 0,
 			"attackReach": 1,
 			"canBuild": false
 		},
@@ -37,8 +36,7 @@
 			"damageCore": 3,
 			"damageUnit": 2,
 			"damageResource": 10,
-			"damageWall": 5,
-			"attackType": 0,
+			"damageWall": 8,
 			"attackReach": 1,
 			"canBuild": false
 		},
@@ -52,7 +50,6 @@
 			"damageUnit": 2,
 			"damageResource": 4,
 			"damageWall": 3,
-			"attackType": 0,
 			"attackReach": 1,
 			"canBuild": false
 		},
@@ -66,7 +63,6 @@
 			"damageUnit": 3,
 			"damageResource": 2,
 			"damageWall": 3,
-			"attackType": 0,
 			"attackReach": 1,
 			"canBuild": true
 		}

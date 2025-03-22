@@ -43,13 +43,6 @@ struct GameConfig
 	std::vector<Position> corePositions;
 };
 
-enum class AttackType
-{
-	DIRECT_HIT,
-	DIRECTION_SHOT,
-	AREA_DAMAGE // not implemented
-};
-
 struct UnitConfig
 {
 	std::string name;
@@ -62,7 +55,6 @@ struct UnitConfig
 	unsigned int damageUnit;
 	unsigned int damageResource;
 	unsigned int damageWall;
-	AttackType attackType;
 	unsigned int attackReach;
 
 	bool canBuild;

@@ -10,6 +10,7 @@ class CreateAction;
 class MoveAction;
 class TransferMoneyAction;
 class BuildAction;
+class AttackAction;
 class Game;
 
 #include "json.hpp"
@@ -20,7 +21,8 @@ enum class ActionType
 	MOVE,
 	CREATE,
 	TRANSFER_MONEY,
-	BUILD
+	BUILD,
+	ATTACK
 };
 
 class Action
@@ -49,5 +51,6 @@ class Action
 #include "TransferMoneyAction.h"
 #include "BuildAction.h"
 #include "Game.h"
+#include "AttackAction.h"
 
 #endif // ACTION_H

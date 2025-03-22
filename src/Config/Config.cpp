@@ -7,7 +7,8 @@ namespace {
 	std::unique_ptr<GameConfig> configInstance;
 }
 
-GameConfig parseConfig() {
+GameConfig parseConfig()
+{
 	GameConfig config;
 
 	std::ifstream inFile("config.json");
@@ -56,8 +57,6 @@ GameConfig parseConfig() {
 			unit.damageUnit     = unitJson.value("damageUnit", 0);
 			unit.damageResource = unitJson.value("damageResource", 0);
 			unit.damageWall     = unitJson.value("damageWall", 0);
-			int attackTypeInt   = unitJson.value("attackType", 0);
-			unit.attackType     = static_cast<AttackType>(attackTypeInt);
 			unit.attackReach    = unitJson.value("attackReach", 0);
 			unit.canBuild       = unitJson.value("canBuild", false);
 
@@ -139,12 +138,20 @@ json Config::encodeConfig()
 		u["damageUnit"] = unit.damageUnit;
 		u["damageResource"] = unit.damageResource;
 		u["damageWall"] = unit.damageWall;
-		u["attackType"] = (int)unit.attackType;
 		u["attackReach"] = unit.attackReach;
 
 		u["canBuild"] = unit.canBuild;
 
 		configJson["units"].push_back(u);
+	}
+
+	configJson["corePositions"] = json::array();
+	for (auto& pos : config.corePositions)
+	{
+		json p;
+		p["x"] = pos.x;
+		p["y"] = pos.y;
+		configJson["corePositions"].push_back(p);
 	}
 
 	return configJson;

@@ -286,17 +286,24 @@ void JigsawWorldGenerator::mirrorWorld(Game* game)
 		objects.end()
 	);
 
+	std::vector<Object*> mirrorCandidates;
 	for (const auto& obj : objects)
 	{
 		Position pos = obj->getPosition();
 		double ratio = static_cast<double>(pos.x) / (width - 1) + static_cast<double>(pos.y) / (height - 1);
 		if (ratio < 1.0 && obj->getType() != ObjectType::Core)
 		{
-			int newX = height - 1 - pos.x;
-			int newY = width  - 1 - pos.y;
-			Position newPos(newX, newY);
-			obj->clone(newPos, game);
+			mirrorCandidates.push_back(obj.get());
 		}
+	}
+
+	for (Object* obj : mirrorCandidates)
+	{
+		Position pos = obj->getPosition();
+		int newX = height - 1 - pos.x;
+		int newY = width  - 1 - pos.y;
+		Position newPos(newX, newY);
+		obj->clone(newPos, game);
 	}
 }
 
