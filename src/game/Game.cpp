@@ -72,7 +72,7 @@ void Game::run()
 	}
 
 	std::cout << "Game over!" << std::endl;
-	json config = getConfig();
+	json config = Config::encodeConfig();
 	replayEncoder_.includeConfig(config);
 	json stats = statsTracker_.getStats();
 	replayEncoder_.includeStats(stats);
@@ -129,7 +129,7 @@ void Game::tick(unsigned long long tick)
 		if (obj->getHP() <= 0)
 		{
 			if (obj->getType() == ObjectType::Unit && ((Unit *)obj)->getBalance() > 0)
-				objects_.push_back(std::make_unique<Resource>(getNextObjectId(), obj->getPosition(), ((Unit *)obj)->getBalance())); // drop balance on death
+				objects_.push_back(std::make_unique<Money>(getNextObjectId(), obj->getPosition(), ((Unit *)obj)->getBalance())); // drop balance on death
 			if (obj->getType() == ObjectType::Unit)
 			{
 				Unit * unit = (Unit *)obj;
@@ -189,7 +189,7 @@ void Game::sendState(std::vector<std::pair<Action *, Core &>> actions, unsigned 
 			o["balance"] = ((Unit &)obj).getBalance();
 			o["nextMoveOpp"] = ((Unit &)obj).getNextMoveOpp();
 		}
-		if (obj.getType() == ObjectType::Resource)
+		if (obj.getType() == ObjectType::Resource || obj.getType() == ObjectType::Money)
 		{
 			o["balance"] = ((Resource &)obj).getBalance();
 		}
@@ -212,56 +212,9 @@ void Game::sendState(std::vector<std::pair<Action *, Core &>> actions, unsigned 
 		bridge->sendMessage(state);
 }
 
-json Game::getConfig() const
-{
-	const GameConfig& config = Config::getInstance();
-
-	json configJson;
-
-	configJson["width"] = config.width;
-	configJson["height"] = config.height;
-	configJson["tickRate"] = config.tickRate;
-
-	configJson["idleIncome"] = config.idleIncome;
-	configJson["idleIncomeTimeOut"] = config.idleIncomeTimeOut;
-
-	configJson["resourceHp"] = config.resourceHp;
-	configJson["resourceIncome"] = config.resourceIncome;
-
-	configJson["coreHp"] = config.coreHp;
-	configJson["initialBalance"] = config.initialBalance;
-
-	configJson["wallHp"] = config.wallHp;
-	configJson["wallBuildCost"] = config.wallBuildCost;
-
-	configJson["units"] = json::array();
-	for (auto& unit : config.units)
-	{
-		json u;
-
-		u["name"] = unit.name;
-		u["cost"] = unit.cost;
-		u["hp"] = unit.hp;
-		u["speed"] = unit.speed;
-		u["minSpeed"] = unit.minSpeed;
-
-		u["damageCore"] = unit.damageCore;
-		u["damageUnit"] = unit.damageUnit;
-		u["damageResource"] = unit.damageResource;
-		u["damageWall"] = unit.damageWall;
-		u["attackType"] = (int)unit.attackType;
-		u["attackReach"] = unit.attackReach;
-
-		u["canBuild"] = unit.canBuild;
-
-		configJson["units"].push_back(u);
-	}
-
-	return configJson;
-}
 void Game::sendConfig()
 {
-	json config = getConfig();
+	json config = Config::encodeConfig();
 
 	for (auto bridge : bridges_)
 	{
@@ -303,6 +256,8 @@ std::vector<Core> Game::getCores()
 // TODO: dont use normal c pointers jesus christ
 Object * Game::getObjectAtPos(Position pos)
 {
+	if (pos.x < 0 || pos.y < 0 || pos.x >= static_cast<int>(Config::getInstance().width) || pos.y >= static_cast<int>(Config::getInstance().height))
+		return nullptr;
 	for (const auto & objPtr : objects_)
 	{
 		Object & obj = *objPtr;
@@ -323,4 +278,17 @@ Object * Game::getObject(unsigned int id)
 	}
 
 	return nullptr;
+}
+void Game::removeObjectById(unsigned int id)
+{
+	for (auto it = objects_.begin(); it != objects_.end(); ++it)
+	{
+		Object & obj = **it;
+
+		if (obj.getId() == id)
+		{
+			it = objects_.erase(it);
+			return;
+		}
+	}
 }

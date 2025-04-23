@@ -1,5 +1,9 @@
 #include "Unit.h"
 
+#include "Game.h"
+
+#include <cassert>
+
 Unit::Unit(unsigned int id, unsigned int teamId, Position pos, unsigned int type_id)
 	: Object(id, pos, Config::getInstance().units[type_id].hp, ObjectType::Unit), type_id_(type_id), team_id_(teamId), balance_(0)
 {
@@ -17,7 +21,7 @@ void Unit::travel(MovementDirection dir)
 				position_.y -= 1;
 			break;
 		case MovementDirection::DOWN:
-			if (position_.y < config.height - 1)
+			if (position_.y < static_cast<int>(config.height) - 1)
 				position_.y += 1;
 			break;
 		case MovementDirection::LEFT:
@@ -25,7 +29,7 @@ void Unit::travel(MovementDirection dir)
 				position_.x -= 1;
 			break;
 		case MovementDirection::RIGHT:
-			if (position_.x < config.width - 1)
+			if (position_.x < static_cast<int>(config.width) - 1)
 				position_.x += 1;
 			break;
 	}
@@ -53,4 +57,13 @@ unsigned int Unit::calcNextMovementOpp()
 		speed = minSpeed;
 
 	return speed;
+}
+
+std::unique_ptr<Object> & Unit::clone(Position newPos, Game * game) const
+{
+	(void)newPos;
+	(void)game;
+	assert(false && "Unit::clone() should never be called for Core objects");
+	static std::unique_ptr<Object> dummy;
+	return dummy;
 }

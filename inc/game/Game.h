@@ -36,6 +36,7 @@ class Game
 		std::vector<std::unique_ptr<Object>> & getObjects() { return objects_; }
 
 		Object * getObjectAtPos(Position pos);
+		void removeObjectById(unsigned int id);
 
 		unsigned int getNextObjectId() { return nextObjectId_++; }
 		StatsTracker statsTracker_;
@@ -44,7 +45,6 @@ class Game
 	private:
 		void tick(unsigned long long tick);
 		void sendState(std::vector<std::pair<Action *, Core &>> actions, unsigned long long tick);
-		json getConfig() const;
 		void sendConfig();
 
 		unsigned int teamCount_;
