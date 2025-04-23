@@ -130,8 +130,12 @@ void Game::tick(unsigned long long tick)
 		{
 			if (obj->getType() == ObjectType::Unit && ((Unit *)obj)->getBalance() > 0)
 				objects_.push_back(std::make_unique<Resource>(getNextObjectId(), obj->getPosition(), ((Unit *)obj)->getBalance())); // drop balance on death
+			if (obj->getType() == ObjectType::Unit)
+			{
+				Unit * unit = (Unit *)obj;
+				statsTracker_.incrementRightStats(unit->getTeamId(), UNITS_DIED, 1);
+			}
 			it = objects_.erase(it);
-			//statsTracker_.incrementUnitsDied(obj->getTeamId());
 			teamCount_--;
 			// TODO: handle game over (send message, disconnect bridge, decrease teamCount_)
 		}

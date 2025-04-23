@@ -44,6 +44,7 @@ bool CreateAction::execute(Game *game, Core * core)
 
 	game->getObjects().push_back(std::make_unique<Unit>(game->getNextObjectId(), core->getTeamId(), closestEmptyPos, unitType));
 	core->setBalance(core->getBalance() - unitCost);
-
+	game->statsTracker_.incrementRightStats(core->getTeamId(), MONEY_SPENT, unitCost); // stats tracking
+	game->statsTracker_.incrementRightStats(core->getTeamId(), UNITS_CREATED, 1); // stats tracking
 	return true;
 }

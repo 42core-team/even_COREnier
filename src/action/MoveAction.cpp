@@ -1,5 +1,6 @@
 #include "MoveAction.h"
 #include "StatsTracker.h"
+void attackStats(Game *game, Unit * unit, Object * obj);
 
 MoveAction::MoveAction(json msg) : Action(ActionType::MOVE), attacked_(false)
 {
@@ -55,7 +56,8 @@ json MoveAction::encodeJSON()
 	return js;
 }
 
-bool MoveAction::attackObj(Object *obj, Unit * unit) // returns object new hp, 1 if no object present
+// returns object new hp, 1 if no object present 
+bool MoveAction::attackObj(Object *obj, Unit * unit)
 {
 	if (!obj)
 		return false;
@@ -79,6 +81,7 @@ bool MoveAction::attackObj(Object *obj, Unit * unit) // returns object new hp, 1
 
 	return true;
 }
+
 bool MoveAction::execute(Game *game, Core * core)
 {
 	if (!is_valid_)
@@ -106,16 +109,18 @@ bool MoveAction::execute(Game *game, Core * core)
 	{
 		unit->setPosition(newPos);
 		// movement stat tracking
-		game->statsTracker_.incrementMovement(core->getTeamId());
-		//game->statsTracker_.printStats();
+		game->statsTracker_.incrementRightStats(core->getTeamId(), MOVEMENT, 1);
 		unit->resetNextMoveOpp();
 		return true;
 	}
 
-	if (attackType == AttackType::DIRECT_HIT)
+	if (attackType == AttackType::DIRECT_HIT) // direct hit attack
 	{
+		attackStats(game, unit, obj);
+		//int tempBalance = unit->getBalance();
 		if (!attackObj(obj, unit))
 			return false;
+		// moneyStats(game, unit, tempBalance);
 	}
 	else if (attackType == AttackType::DIRECTION_SHOT)
 	{
@@ -146,3 +151,59 @@ bool MoveAction::execute(Game *game, Core * core)
 
 	return true;
 }
+
+
+void attackStats(Game *game, Unit * unit, Object * obj)
+{
+	if (!obj)
+		return;
+	if (obj->getType() == ObjectType::Unit) {
+		if ((int)Config::getInstance().units[unit->getTypeId()].damageUnit < obj->getHP()) {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, Config::getInstance().units[unit->getTypeId()].damageUnit);
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), DAMAGE_ON_UNITS, Config::getInstance().units[unit->getTypeId()].damageUnit);
+		}
+		else {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), UNITS_KILLED, 1);
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, obj->getHP());
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), DAMAGE_ON_UNITS, obj->getHP());
+		}
+	}
+	if (obj->getType() == ObjectType::Core) {
+		if ((int)Config::getInstance().units[unit->getTypeId()].damageCore < obj->getHP()) {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, Config::getInstance().units[unit->getTypeId()].damageCore);
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), DAMAGE_ON_CORES, Config::getInstance().units[unit->getTypeId()].damageCore);
+		}
+		else {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), CORES_DESTROYED, 1);
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, obj->getHP());
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), DAMAGE_ON_CORES, obj->getHP());
+		}
+	}
+	if (obj->getType() == ObjectType::Wall) {
+		if ((int)Config::getInstance().units[unit->getTypeId()].damageWall < obj->getHP()) {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, Config::getInstance().units[unit->getTypeId()].damageWall);
+		}
+		else {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), WALLS_DESTROYED, 1);
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, obj->getHP());
+		}
+	}
+	if (obj->getType() == ObjectType::Resource) {
+		if ((int)Config::getInstance().units[unit->getTypeId()].damageResource < (int)obj->getHP()) {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, Config::getInstance().units[unit->getTypeId()].damageResource);
+		}
+		else {
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), RECOURCES_MINED, 1);
+			game->statsTracker_.incrementRightStats(unit->getTeamId(), TOTAL_DAMAGE, obj->getHP());
+		}
+		game->statsTracker_.incrementRightStats(unit->getTeamId(), RECOURCES_MINED, 1);
+	}
+}
+
+// void moneyStats(Game *game, Unit *unit, int tempBalance)
+// {
+// 	if (tempBalance < unit->getBalance())
+// 		game->statsTracker_.incrementRightStats(unit->getTeamId(), MONEY_SPENT, unit->getBalance() - tempBalance);
+// 	if (tempBalance > unit->getBalance())
+// 		game->statsTracker_.incrementRightStats(unit->getTeamId(), MONEY_GAINED, tmepBalance - unit->getBalance());
+// }
