@@ -2,7 +2,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
-#include <iostream>
 #include <thread>
 #include <cstring>
 #include <vector>
@@ -12,6 +11,7 @@
 #include <cerrno>
 
 #include "Bridge.h"
+#include "Socket.hpp"
 #include "Game.h"
 #include "Config.h"
 #include "Logger.h"
@@ -57,17 +57,16 @@ int main(int argc, char *argv[])
 		teamIdsStr += std::to_string(teamId) + " ";
 	Logger::Log(teamIdsStr);
 
-	int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (server_fd < 0)
+	Socket server_fd {AF_INET, SOCK_STREAM, 0};
+	if (server_fd.get_fd() < 0)
 	{
 		Logger::Log(LogLevel::ERROR, "Could not create socket.");
 		return 1;
 	}
 	int opt = 1;
-	if (setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+	if (setsockopt(server_fd.get_fd(), SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 	{
 		Logger::Log(LogLevel::ERROR, "Could not set socket options.");
-		close(server_fd);
 		return 1;
 	}
 
@@ -76,17 +75,15 @@ int main(int argc, char *argv[])
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(4242);
 
-	if (bind(server_fd, reinterpret_cast<sockaddr *>(&address), sizeof(address)) < 0)
+	if (bind(server_fd.get_fd(), reinterpret_cast<sockaddr *>(&address), sizeof(address)) < 0)
 	{
 		Logger::Log(LogLevel::ERROR, "Could not bind socket.");
-		close(server_fd);
 		return 1;
 	}
 
-	if (listen(server_fd, SOMAXCONN) < 0)
+	if (listen(server_fd.get_fd(), SOMAXCONN) < 0)
 	{
 		Logger::Log(LogLevel::ERROR, "Could not listen on socket.");
-		close(server_fd);
 		return 1;
 	}
 
@@ -99,7 +96,7 @@ int main(int argc, char *argv[])
 	{
 		sockaddr_in clientAddress;
 		socklen_t clientLen = sizeof(clientAddress);
-		int client_fd = accept(server_fd, reinterpret_cast<sockaddr *>(&clientAddress), &clientLen);
+		int client_fd = accept(server_fd.get_fd(), reinterpret_cast<sockaddr *>(&clientAddress), &clientLen);
 		if (client_fd < 0)
 		{
 			Logger::Log(LogLevel::WARNING, "accept failed: " + std::string(strerror(errno)));
@@ -158,6 +155,5 @@ int main(int argc, char *argv[])
 
 	gameThread.join();
 
-	close(server_fd);
 	return 0;
 }

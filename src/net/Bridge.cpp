@@ -3,8 +3,6 @@
 #include <sys/socket.h> // For shutdown()
 #include <unistd.h>		// For close(), read() and write()
 #include <cstring>		// For strerror()
-#include <iostream>
-#include <stdexcept>
 #include <errno.h>
 
 Bridge::Bridge(int socket_fd, unsigned int teamId)
