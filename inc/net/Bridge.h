@@ -10,7 +10,6 @@
 #include <atomic>
 
 #include "Logger.h"
-
 #include "json.hpp"
 using json = nlohmann::ordered_json;
 
@@ -22,8 +21,7 @@ class Bridge
 
 		void sendMessage(const json& message);
 		bool receiveMessage(json& message);
-		bool tryReceiveMessage(json &message);
-		bool isDisconnected();
+		bool tryReceiveMessage(json& message);
 
 		void start();
 
@@ -40,6 +38,7 @@ class Bridge
 		int socket_fd_;
 		unsigned int team_id_;
 		std::string team_name_;
+
 		std::thread readThread_;
 		std::thread writeThread_;
 
@@ -51,7 +50,7 @@ class Bridge
 		std::mutex readMutex_;
 		std::condition_variable readCv_;
 
-		std::atomic<bool> disconnected_;
+		std::atomic<bool> closing_{false};
 };
 
 #endif // BRIDGE_H

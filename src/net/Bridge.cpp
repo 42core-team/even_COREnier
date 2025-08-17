@@ -1,47 +1,46 @@
 #include "Bridge.h"
-
 #include "Board.h"
 
-#include <sys/socket.h> // For shutdown()
-#include <unistd.h>		// For close(), read() and write()
-#include <cstring>		// For strerror()
+#include <sys/socket.h>
+#include <unistd.h>
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 #include <errno.h>
+#include <chrono>
 
 Bridge::Bridge(int socket_fd, unsigned int teamId)
-	: socket_fd_(socket_fd), team_id_(teamId), disconnected_(false)
+	: socket_fd_(socket_fd), team_id_(teamId)
 {
-	// Set a timeout for the socket.
-	struct timeval tv;
+	timeval tv{};
 	tv.tv_sec = 1;
 	tv.tv_usec = 0;
 	if (setsockopt(socket_fd_, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv)) < 0)
-	{
-		Logger::Log(LogLevel::WARNING, "Error setting socket timeout: " + std::string(strerror(errno)) + ". Disconnecting " + std::to_string(team_id_) + ".");
-		disconnected_ = true;
-	}
+		Logger::LogWarn(std::string("setsockopt(SO_RCVTIMEO) failed: ") + strerror(errno));
+	if (setsockopt(socket_fd_, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv)) < 0)
+		Logger::LogWarn(std::string("setsockopt(SO_SNDTIMEO) failed: ") + strerror(errno));
 }
 
 Bridge::~Bridge()
 {
-	disconnected_ = true;
-
-	auto core = Board::instance().getCoreByTeamId(team_id_);
-	if (core != nullptr) {
-		Board::instance().removeObjectById(core->getId());
-		Logger::Log("Core of team " + std::to_string(team_id_) + " has been removed from the board.");
-	} else {
-		Logger::Log(LogLevel::WARNING, "Core not found for team ID: " + std::to_string(team_id_) + ". Unable to remove object.");
-	}
-
+	shutdown(socket_fd_, SHUT_RD);
+	closing_.store(true);
 	writeCv_.notify_all();
 	readCv_.notify_all();
-	shutdown(socket_fd_, SHUT_RDWR);
-	if (readThread_.joinable())
-		readThread_.join();
+
+	{
+		std::unique_lock<std::mutex> lk(readMutex_);
+		readCv_.wait_for(lk, std::chrono::seconds(5), [this]{ return readQueue_.empty(); });
+	}
+
 	if (writeThread_.joinable())
 		writeThread_.join();
+
+	shutdown(socket_fd_, SHUT_WR);
+
+	if (readThread_.joinable())
+		readThread_.join();
+
 	close(socket_fd_);
 }
 
@@ -65,17 +64,14 @@ bool Bridge::receiveMessage(json &message)
 {
 	std::unique_lock<std::mutex> lock(readMutex_);
 	if (readQueue_.empty())
-	{
-		readCv_.wait(lock, [this]
-					 { return !readQueue_.empty() || disconnected_; });
-	}
+		readCv_.wait(lock, [this]{ return !readQueue_.empty() || closing_.load(); });
 	if (readQueue_.empty())
 		return false;
 	message = readQueue_.front();
 	readQueue_.pop();
-	// std::cout << "Server received message: " << message << std::endl;
 	return true;
 }
+
 bool Bridge::tryReceiveMessage(json &message)
 {
 	std::lock_guard<std::mutex> lock(readMutex_);
@@ -86,109 +82,85 @@ bool Bridge::tryReceiveMessage(json &message)
 	return true;
 }
 
-bool Bridge::isDisconnected()
-{
-	return disconnected_;
-}
-
 void Bridge::readLoop()
 {
-	try
-	{
-		constexpr size_t buffer_size = 1024;
-		char buffer[buffer_size];
-		std::string data;
-		while (!disconnected_)
-		{
-			ssize_t n = ::read(socket_fd_, buffer, buffer_size);
-			if (n < 0)
-			{
-				if (errno == EAGAIN || errno == EWOULDBLOCK)
-				{
-					std::this_thread::sleep_for(std::chrono::milliseconds(1));
-					continue;
-				}
-				else
-				{
-					Logger::Log(LogLevel::WARNING, "Read error: " + std::string(strerror(errno)) + ". Disconnecting " + std::to_string(team_id_) + ".");
-					disconnected_ = true;
-					break;
-				}
-			}
-			else if (n == 0)
-			{
-				Logger::Log(LogLevel::WARNING, "Connection closed by peer. Disconnecting " + std::to_string(team_id_) + ".");
-				disconnected_ = true;
-				break;
-			}
-			data.append(buffer, n);
+	constexpr size_t buffer_size = 1024;
+	char buffer[buffer_size];
+	std::string data;
 
-			size_t pos;
-			while ((pos = data.find('\n')) != std::string::npos)
+	for (;;)
+	{
+		if (closing_.load())
+			break;
+
+		ssize_t n = ::read(socket_fd_, buffer, buffer_size);
+		if (n < 0)
+		{
+			if (errno == EAGAIN || errno == EWOULDBLOCK)
+				continue;
+			Logger::LogWarn(std::string("Read error: ") + strerror(errno));
+			break;
+		}
+		if (n == 0)
+			break;
+
+		data.append(buffer, n);
+
+		size_t pos;
+		while ((pos = data.find('\n')) != std::string::npos)
+		{
+			std::string line = data.substr(0, pos);
+			data.erase(0, pos + 1);
+			if (line.empty())
+				continue;
+			try
 			{
-				std::string line = data.substr(0, pos);
-				data.erase(0, pos + 1);
-				if (!line.empty())
+				json j = json::parse(line);
 				{
-					try
-					{
-						json j = json::parse(line);
-						{
-							std::lock_guard<std::mutex> lock(readMutex_);
-							readQueue_.push(j);
-						}
-						readCv_.notify_one();
-					}
-					catch (json::parse_error &e)
-					{
-						Logger::Log(LogLevel::WARNING, "JSON parse error: " + std::string(e.what()) + ". Skipping message (team id: " + std::to_string(team_id_) + ").");
-					}
+					std::lock_guard<std::mutex> lock(readMutex_);
+					readQueue_.push(j);
 				}
+				readCv_.notify_one();
+			}
+			catch (json::parse_error &e)
+			{
+				Logger::LogWarn(std::string("JSON parse error: ") + e.what());
 			}
 		}
-	}
-	catch (std::exception &e)
-	{
-		Logger::Log(LogLevel::WARNING, "Exception: " + std::string(e.what()) + ". Disconnecting " + std::to_string(team_id_) + ".");
-		disconnected_ = true;
 	}
 }
 
 void Bridge::writeLoop()
 {
-	try
+	for (;;)
 	{
-		while (!disconnected_)
+		std::unique_lock<std::mutex> lock(writeMutex_);
+		writeCv_.wait(lock, [this]{ return closing_.load() || !writeQueue_.empty(); });
+		if (closing_.load() && writeQueue_.empty())
+			break;
+
+		while (!writeQueue_.empty())
 		{
-			std::unique_lock<std::mutex> lock(writeMutex_);
-			writeCv_.wait(lock, [this]
-						  { return !writeQueue_.empty() || disconnected_; });
-			while (!writeQueue_.empty())
+			std::string msg = writeQueue_.front();
+			writeQueue_.pop();
+			lock.unlock();
+
+			const char *data = msg.c_str();
+			size_t remaining = msg.size();
+			while (remaining > 0)
 			{
-				std::string msg = writeQueue_.front();
-				writeQueue_.pop();
-				lock.unlock();
-				const char *data = msg.c_str();
-				size_t remaining = msg.size();
-				while (remaining > 0)
+				ssize_t n = ::send(socket_fd_, data, remaining, MSG_NOSIGNAL);
+				if (n < 0)
 				{
-					ssize_t n = ::send(socket_fd_, data, remaining, MSG_NOSIGNAL);
-					if (n < 0)
-					{
-						Logger::Log(LogLevel::WARNING, std::string("Write error: ") + std::string(strerror(errno)) + ". Disconnecting " + std::to_string(team_id_) + ".");
-						disconnected_ = true;
-						break;
-					}
-					remaining -= n;
-					data += n;
+					Logger::LogWarn(std::string("Write error: ") + strerror(errno));
+					remaining = 0;
+					break;
 				}
-				lock.lock();
+				remaining -= static_cast<size_t>(n);
+				data += n;
 			}
+
+			lock.lock();
 		}
-	}
-	catch (std::exception &e)
-	{
-		Logger::Log(LogLevel::WARNING, "Exception: " + std::string(e.what()) + ". Disconnecting " + std::to_string(team_id_) + ".");
-		disconnected_ = true;
 	}
 }
