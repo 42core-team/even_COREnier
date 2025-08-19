@@ -2,6 +2,27 @@
 
 This document explains the Woodpecker CI pipeline configuration that replaces the GitHub Actions workflow for building and publishing the game server Docker images.
 
+## Available Pipeline Configurations
+
+Three different Woodpecker CI configurations are provided to suit different needs:
+
+1. **`.woodpecker.yml`** - **Recommended**: Full-featured pipeline with explicit steps for maximum control
+2. **`.woodpecker-matrix.yml`** - Matrix-based approach similar to GitHub Actions structure  
+3. **`.woodpecker-simple.yml`** - Simplified single-step multi-arch build for basic use cases
+
+Choose the one that best fits your Woodpecker CI setup and requirements.
+
+### Configuration Comparison
+
+| Feature | `.woodpecker.yml` | `.woodpecker-matrix.yml` | `.woodpecker-simple.yml` |
+|---------|------------------|-------------------------|-------------------------|
+| **Architecture Handling** | Explicit steps per arch | Matrix strategy | Single multi-arch step |
+| **Manifest Creation** | Explicit steps | Separate pipeline | Automatic |
+| **Complexity** | High | Medium | Low |
+| **Control Level** | Maximum | High | Basic |
+| **GitHub Actions Similarity** | Different approach | Very similar | Simplified |
+| **Recommended For** | Production | Migration from GHA | Testing/Simple setups |
+
 ## Overview
 
 The Woodpecker CI pipeline (`.woodpecker.yml`) provides the same functionality as the original GitHub Actions workflow (`.github/workflows/build-game-server.yaml`):
@@ -77,10 +98,20 @@ The pipeline triggers on:
 
 When migrating from GitHub Actions to Woodpecker CI:
 
-1. **Secrets**: Configure `github_username` and `github_token` secrets in Woodpecker
-2. **Runners**: Ensure you have runners capable of multi-architecture builds or Docker buildx
-3. **Registry Access**: Verify Woodpecker runners can access `ghcr.io`
-4. **Dockerfile Path**: The pipeline uses the same Dockerfile at `.github/workflows/game-server-Dockerfile`
+1. **Choose Configuration**: Select one of the three provided configurations based on your needs:
+   - Use `.woodpecker.yml` for production environments requiring maximum control
+   - Use `.woodpecker-matrix.yml` if you prefer the GitHub Actions matrix approach
+   - Use `.woodpecker-simple.yml` for simpler setups or testing
+
+2. **Rename Configuration**: Rename your chosen file to `.woodpecker.yml` (Woodpecker's default name)
+
+3. **Secrets**: Configure `github_username` and `github_token` secrets in Woodpecker
+
+4. **Runners**: Ensure you have runners capable of multi-architecture builds or Docker buildx
+
+5. **Registry Access**: Verify Woodpecker runners can access `ghcr.io`
+
+6. **Dockerfile Path**: The pipeline uses the same Dockerfile at `.github/workflows/game-server-Dockerfile`
 
 ## Troubleshooting
 
