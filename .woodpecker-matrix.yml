@@ -1,0 +1,98 @@
+# Alternative Woodpecker CI Pipeline using Matrix Strategy
+# This version uses matrix builds similar to the GitHub Actions approach
+
+when:
+  event: [push, pull_request, manual]
+  branch: [main, dev, event-*, rush-*]
+
+matrix:
+  PLATFORM:
+    - linux/amd64
+    - linux/arm64
+
+variables:
+  REGISTRY_IMAGE: ghcr.io/42core-team/game-server
+  DOCKERFILE: .github/workflows/game-server-Dockerfile
+
+steps:
+  # Test build for pull requests - only compile, don't push
+  test-build:
+    when:
+      event: pull_request
+    image: plugins/docker
+    settings:
+      dockerfile: ${DOCKERFILE}
+      context: .
+      dry_run: true
+      platforms: ${PLATFORM}
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
+
+  # Build and push for main branches
+  build:
+    when:
+      event: [push, manual]
+    image: plugins/docker
+    settings:
+      dockerfile: ${DOCKERFILE}
+      context: .
+      registry: ghcr.io
+      repo: ${REGISTRY_IMAGE}
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      platforms: ${PLATFORM}
+      tags:
+        - ${CI_COMMIT_BRANCH}-${PLATFORM//\//-}
+        - ${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}-${PLATFORM//\//-}
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
+
+---
+# Separate pipeline for manifest creation (runs after matrix builds complete)
+when:
+  event: [push, manual]
+  branch: [main, dev, event-*, rush-*]
+
+depends_on:
+  - build-game-server  # Name of the matrix pipeline above
+
+steps:
+  # Create manifest for branch name tag
+  create-manifest:
+    image: plugins/manifest
+    settings:
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      target: ghcr.io/42core-team/game-server:${CI_COMMIT_BRANCH}
+      template: ghcr.io/42core-team/game-server:${CI_COMMIT_BRANCH}-ARCH
+      platforms:
+        - linux/amd64
+        - linux/arm64
+
+  # Create manifest for commit SHA tag
+  create-manifest-sha:
+    image: plugins/manifest
+    settings:
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      target: ghcr.io/42core-team/game-server:${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}
+      template: ghcr.io/42core-team/game-server:${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}-ARCH
+      platforms:
+        - linux/amd64
+        - linux/arm64
+
+  # Inspect the created manifest
+  inspect-image:
+    image: docker:cli
+    depends_on: [create-manifest]
+    commands:
+      - echo "Inspecting multi-architecture image..."
+      - docker buildx imagetools inspect ghcr.io/42core-team/game-server:${CI_COMMIT_BRANCH}
+    environment:
+      DOCKER_CLI_EXPERIMENTAL: enabled
