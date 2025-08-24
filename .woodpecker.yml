@@ -1,0 +1,147 @@
+# Woodpecker CI Pipeline
+# Equivalent to GitHub Actions build-game-server.yaml
+# Builds and publishes multi-architecture Docker images
+
+# Global pipeline triggers
+when:
+  event: [push, pull_request, manual]
+  branch: [main, dev, event-*, rush-*]
+
+variables:
+  REGISTRY_IMAGE: ghcr.io/42core-team/game-server
+  DOCKERFILE: .github/workflows/game-server-Dockerfile
+
+# =============================================================================
+# PULL REQUEST JOBS - Test build only, no push
+# =============================================================================
+
+steps:
+  # Test build for AMD64 architecture
+  test-build-amd64:
+    when:
+      event: pull_request
+    image: plugins/docker
+    settings:
+      dockerfile: ${DOCKERFILE}
+      context: .
+      dry_run: true
+      platforms: linux/amd64
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
+
+  # Test build for ARM64 architecture  
+  test-build-arm64:
+    when:
+      event: pull_request
+    image: plugins/docker
+    settings:
+      dockerfile: ${DOCKERFILE}
+      context: .
+      dry_run: true
+      platforms: linux/arm64
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
+
+# =============================================================================
+# PUSH JOBS - Build and push to registry
+# =============================================================================
+
+  # Build and push AMD64 image
+  build-amd64:
+    when:
+      event: [push, manual]
+    image: plugins/docker
+    settings:
+      dockerfile: ${DOCKERFILE}
+      context: .
+      registry: ghcr.io
+      repo: ${REGISTRY_IMAGE}
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      platforms: linux/amd64
+      tags:
+        - ${CI_COMMIT_BRANCH}-amd64
+        - ${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}-amd64
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
+      cache_from:
+        - ${REGISTRY_IMAGE}:cache-amd64
+
+  # Build and push ARM64 image
+  build-arm64:
+    when:
+      event: [push, manual]
+    image: plugins/docker
+    settings:
+      dockerfile: ${DOCKERFILE}
+      context: .
+      registry: ghcr.io
+      repo: ${REGISTRY_IMAGE}
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      platforms: linux/arm64
+      tags:
+        - ${CI_COMMIT_BRANCH}-arm64
+        - ${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}-arm64
+      build_args:
+        - BUILDKIT_INLINE_CACHE=1
+      cache_from:
+        - ${REGISTRY_IMAGE}:cache-arm64
+
+# =============================================================================
+# MANIFEST CREATION - Combine multi-arch images
+# =============================================================================
+
+  # Create manifest for branch name tag
+  create-manifest:
+    when:
+      event: [push, manual]
+    image: plugins/manifest
+    depends_on: [build-amd64, build-arm64]
+    settings:
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      target: ${REGISTRY_IMAGE}:${CI_COMMIT_BRANCH}
+      template: ${REGISTRY_IMAGE}:${CI_COMMIT_BRANCH}-ARCH
+      platforms:
+        - linux/amd64
+        - linux/arm64
+
+  # Create manifest for commit SHA tag
+  create-manifest-sha:
+    when:
+      event: [push, manual]
+    image: plugins/manifest
+    depends_on: [build-amd64, build-arm64]
+    settings:
+      username:
+        from_secret: github_username
+      password:
+        from_secret: github_token
+      target: ${REGISTRY_IMAGE}:${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}
+      template: ${REGISTRY_IMAGE}:${CI_COMMIT_BRANCH}-${CI_COMMIT_SHA}-ARCH
+      platforms:
+        - linux/amd64
+        - linux/arm64
+
+# =============================================================================
+# IMAGE INSPECTION - Verify the final multi-arch image
+# =============================================================================
+
+  # Inspect the created manifest
+  inspect-image:
+    when:
+      event: [push, manual]
+    image: docker:cli
+    depends_on: [create-manifest]
+    commands:
+      - echo "Inspecting multi-architecture image..."
+      - docker buildx imagetools inspect ${REGISTRY_IMAGE}:${CI_COMMIT_BRANCH}
+    environment:
+      DOCKER_CLI_EXPERIMENTAL: enabled
